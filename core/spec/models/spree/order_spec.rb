@@ -417,6 +417,54 @@ describe Spree::Order, :type => :model do
         expect(line_items.pluck(:variant_id)).to match_array([variant.id, variant_2.id])
       end
     end
+
+    context "merging with existing promotions" do
+      let(:old_order) { create(:order_with_line_items, line_items_price: 50) }
+      let(:new_order) { create(:order_with_line_items, line_items_price: 50) }
+
+      before {
+        old_order.coupon_code = promotion.code
+        Spree::PromotionHandler::Coupon.new(old_order).apply
+      }
+
+      describe "with line item promotions" do
+        let(:promotion) { create(:promotion_with_item_adjustment, code: 'line') }
+
+        it "carries over previous promotions" do
+          new_order.merge!(old_order)
+          expect(new_order.promo_total).to eq old_order.promo_total
+        end
+
+        it "selects the best of conflicting promotions" do
+          better_promo = create(:promotion_with_item_adjustment, adjustment_rate: 20, code: 'line_up')
+          new_order.coupon_code = better_promo.code
+          Spree::PromotionHandler::Coupon.new(new_order).apply
+          new_order.merge!(old_order)
+          expect(new_order.promo_total).to eq new_order.promo_total
+        end
+
+        pending "moves all line item adjustments to the new order"
+      end
+
+      describe "with order promotions" do
+        let(:promotion) { create(:promotion_with_order_adjustment, code: 'order') }
+
+        it "carries over previous promotions" do
+          new_order.merge!(old_order)
+          expect(new_order.promo_total).to eq old_order.promo_total
+        end
+
+        it "selects the best of conflicting promotions" do
+          better_promo = create(:promotion_with_order_adjustment, weighted_order_adjustment_amount: 20, code: 'order_up')
+          new_order.coupon_code = better_promo.code
+          Spree::PromotionHandler::Coupon.new(new_order).apply
+          new_order.merge!(old_order)
+          expect(new_order.promo_total).to eq new_order.promo_total
+        end
+
+        pending "moves all order adjustments to the new order"
+      end
+    end
   end
 
   context "#confirmation_required?" do

@@ -481,10 +481,16 @@ module Spree
         end
       end
 
+      order.all_adjustments.each { |adjustment|
+        updated_attrs = {order_id: self.id}
+        updated_attrs.merge!(adjustable: self) if adjustment.adjustable.is_a? Spree::Order
+        adjustment.update_attributes(updated_attrs)
+      }
+
       self.associate_user!(user) if !self.user && !user.blank?
 
       updater.update_item_count
-      updater.update_item_total
+      updater.update_totals
       updater.persist_totals
 
       # So that the destroy doesn't take out line items which may have been re-assigned
